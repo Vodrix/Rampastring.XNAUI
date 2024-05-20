@@ -15,6 +15,8 @@ namespace Rampastring.XNAUI.XNAControls
 
         public virtual Texture2D BackgroundTexture { get; set; }
 
+        public virtual string AnimatedTexture { get; set; }
+
         private Color? _borderColor;
 
         public Color BorderColor
@@ -79,6 +81,10 @@ namespace Rampastring.XNAUI.XNAControls
                     return;
                 case "BackgroundTexture":
                     BackgroundTexture = AssetLoader.LoadTexture(value);
+                    return;
+                case "AnimatedTexture":
+                    BackgroundTexture = AssetLoader.LoadTexture(value);
+                    AnimatedTexture = value;
                     return;
                 case "SolidColorBackgroundTexture":
                     BackgroundTexture = AssetLoader.CreateTexture(AssetLoader.GetColorFromString(value), 2, 2);

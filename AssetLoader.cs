@@ -8,6 +8,11 @@ using Rampastring.Tools;
 using Color = Microsoft.Xna.Framework.Color;
 using Microsoft.Xna.Framework.Content;
 using Microsoft.Xna.Framework.Media;
+using Rampastring.XNAUI.XNAControls;
+using System.Drawing.Imaging;
+using System.Windows.Forms;
+using System.Reflection;
+
 
 namespace Rampastring.XNAUI
 {
@@ -187,12 +192,15 @@ namespace Rampastring.XNAUI
             {
                 using (MemoryStream stream = new MemoryStream())
                 {
-                    image.Save(stream, System.Drawing.Imaging.ImageFormat.Png);
+                    image.Save(stream, ImageFormat.Bmp);
                     stream.Seek(0, SeekOrigin.Begin);
                     Texture2D texture = Texture2D.FromStream(graphicsDevice, stream);
                     PremultiplyAlpha(texture);
+                    //stream.Dispose();
+                    //image.Dispose();
                     return texture;
                 }
+
             }
             catch (Exception ex)
             {
@@ -314,6 +322,120 @@ namespace Rampastring.XNAUI
             {
                 throw new Exception("AssetLoader.GetRGBAColorFromString: Failed to convert " + colorString + " to a valid color!");
             }
+        }
+
+        public static void CacheAnimatedTextures(this XNAPanel btn, Image image)
+        {
+            var mImageFrames = AnimatedGif.ExtractFrames(image);
+
+            if (mImageFrames.Count > 0)
+            {
+                int CacheIndex = 0;
+                while (mImageFrames.Count > CacheIndex)
+                {
+                    Texture2D cachedTexture = textureCache.Find((Texture2D t) => t.Name == btn.Name + CacheIndex.ToString());
+                    if (cachedTexture == null)
+                    {
+                        Texture2D texture = TextureFromImage(mImageFrames[CacheIndex].Image);
+                        texture.Name = btn.Name + CacheIndex.ToString();
+                        textureCache.Add(texture);
+                    }
+                    CacheIndex++;
+                }
+            }
+        }
+
+        public static void AnimateXNAPanel(this XNAPanel btn, Image image)
+        {
+            var mImageFrames = AnimatedGif.ExtractFrames(image);
+
+            if (mImageFrames.Count > 0)
+            {
+                if (mImageFrames.Count > 1)
+                {
+                    var mIndex = 0;
+                    var mTimer = new Timer
+                    {
+                        Interval = mImageFrames[0].Duration * 10,
+                    };
+
+                    mTimer.Tick += (object sender, EventArgs e) =>
+                    {
+                        mTimer.Stop();
+
+                        if (mIndex < mImageFrames.Count - 1)
+                            mIndex++;
+                        else
+                            mIndex = 0;
+
+                        Texture2D cachedTexture = textureCache.Find((Texture2D t) => t.Name == btn.Name + mIndex.ToString());
+                        if (cachedTexture != null)
+                            btn.BackgroundTexture = cachedTexture;
+                        else
+                        {
+                            Texture2D texture = TextureFromImage(mImageFrames[mIndex].Image);
+                            texture.Name = btn.Name + mIndex.ToString();
+                            btn.BackgroundTexture = texture;
+                            textureCache.Add(texture);
+                        }
+
+                        //mImageFrames[mIndex].Image.Dispose();
+
+                        mTimer.Interval = mImageFrames[mIndex].Duration * 10;
+
+                        mTimer.Start();
+                    };
+
+                    mTimer.Start();
+                }
+            }
+        }
+    }
+
+    public class AnimatedGif
+    {
+        public static List<AnimatedGifFrame> ExtractFrames(Image img)
+        {
+            var mImages = new List<AnimatedGifFrame>();
+
+            try
+            {
+                int frames = img.GetFrameCount(FrameDimension.Time);
+                if (frames <= 1) throw new ArgumentException("Image not animated");
+                byte[] times = img.GetPropertyItem(0x5100).Value;
+                int frame = 0;
+                for (; ; )
+                {
+                    int dur = BitConverter.ToInt32(times, 4 * frame);
+                    mImages.Add(new AnimatedGifFrame(new Bitmap(img), dur));
+
+                    if (++frame >= frames)
+                        break;
+                    img.SelectActiveFrame(FrameDimension.Time, frame);
+                }
+                img.Dispose();
+            }
+            catch
+            {
+                if (mImages.Count == 0)
+                {
+                    mImages.Add(new AnimatedGifFrame(img, 1000));
+                }
+            }
+
+            return mImages;
+        }
+
+        public class AnimatedGifFrame
+        {
+            private int mDuration;
+            private Image mImage;
+            internal AnimatedGifFrame(Image img, int duration)
+            {
+                mImage = img; mDuration = duration;
+            }
+            public Image Image { get { return mImage; } }
+            public int Duration { get { return mDuration; } }
         }
     }
 }
